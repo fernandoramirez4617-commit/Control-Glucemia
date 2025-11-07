@@ -1,4 +1,8 @@
-const API = 'http://localhost:5000/api';
+// Detecta entorno: usa localhost en dev y /api en producción (Render)
+const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000/api'
+  : '/api';
+
 let state = { page: 1, page_size: 10, pages: 1 };
 
 function td(x){ return (x===null||x===undefined||x==='') ? '—' : x; }
@@ -34,7 +38,16 @@ function meds(r){
   return a.join(', ')||'—';
 }
 
-async function fetchJSON(url){ const res=await fetch(url); if(!res.ok) throw new Error('HTTP'); return await res.json(); }
+async function fetchJSON(url){
+  const res = await fetch(url);
+  if(!res.ok){
+    let msg = '';
+    try { const j = await res.json(); msg = j.error || JSON.stringify(j); }
+    catch { msg = await res.text(); }
+    throw new Error(msg || `HTTP ${res.status}`);
+  }
+  return await res.json();
+}
 
 async function loadPatients(){
   const risk=document.getElementById('riskFilter').value;
@@ -170,13 +183,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const fd = new FormData(e.target);
     const payload = Object.fromEntries(fd.entries());
     // Normalize types
-    ['age','glucose_mgdl','systolic','diastolic','weight_kg','height_cm'].forEach(k=>{ if(payload[k]==='') delete payload[k]; else payload[k]=Number(payload[k]); });
-    ['has_hypertension','has_obesity','has_dyslipidemia','has_ckd','has_cvd','has_copd_asthma','has_depression','med_htn','med_dm','med_insulin','med_metformin','med_statins','med_antiplatelet'].forEach(k=> payload[k]= fd.get(k)==='on');
+    ['age','glucose_mgdl','systolic','diastolic','weight_kg','height_cm'].forEach(k=>{
+      if(payload[k]==='') delete payload[k]; else payload[k]=Number(payload[k]);
+    });
+    ['has_hypertension','has_obesity','has_dyslipidemia','has_ckd','has_cvd','has_copd_asthma','has_depression','med_htn','med_dm','med_insulin','med_metformin','med_statins','med_antiplatelet']
+      .forEach(k=> payload[k]= fd.get(k)==='on');
     payload['smoker'] = fd.get('smoker')==='1';
-    const res = await fetch(`${API}/patients`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-    if(!res.ok){ const err = await res.json().catch(()=>({})); alert(err.error||'Error al guardar'); return; }
-    e.target.reset();
-    await loadPatients(); await loadStats();
+
+    try {
+      const res = await fetch(`${API}/patients`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok){
+        let msg = '';
+        try { const err = await res.json(); msg = err.error || JSON.stringify(err); }
+        catch { msg = await res.text(); }
+        alert('Error al guardar: ' + msg);
+        return;
+      }
+      e.target.reset();
+      await loadPatients(); await loadStats();
+      alert('Paciente guardado correctamente ✅');
+    } catch (err) {
+      alert('Error de red: ' + err.message);
+      console.error(err);
+    }
   });
 
   loadPatients(); loadStats();
