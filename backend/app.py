@@ -82,12 +82,18 @@ def init_db():
 # Funciones de cálculo
 # ==========================
 def compute_risk(glucose):
-    try: g = float(glucose)
-    except (TypeError, ValueError): return "desconocido"
-    if g < 70: return "alto (hipoglucemia)"
-    if 70 <= g <= 99: return "bajo"
-    if 100 <= g <= 125: return "moderado"
-    if g >= 126: return "alto"
+    try:
+        g = float(glucose)
+    except (TypeError, ValueError):
+        return "desconocido"
+    if g < 70:
+        return "alto (hipoglucemia)"
+    if 70 <= g <= 99:
+        return "bajo"
+    if 100 <= g <= 125:
+        return "moderado"
+    if g >= 126:
+        return "alto"
     return "desconocido"
 
 def compute_bmi(weight_kg, height_cm):
@@ -96,12 +102,17 @@ def compute_bmi(weight_kg, height_cm):
         h = float(height_cm) / 100.0 if height_cm else None
     except (TypeError, ValueError):
         return None, None
-    if not w or not h or h == 0: return None, None
-    bmi = w / (h*h)
-    if bmi < 18.5: cat = "bajo peso"
-    elif bmi < 25: cat = "normal"
-    elif bmi < 30: cat = "sobrepeso"
-    else: cat = "obesidad"
+    if not w or not h or h == 0:
+        return None, None
+    bmi = w / (h * h)
+    if bmi < 18.5:
+        cat = "bajo peso"
+    elif bmi < 25:
+        cat = "normal"
+    elif bmi < 30:
+        cat = "sobrepeso"
+    else:
+        cat = "obesidad"
     return round(bmi, 1), cat
 
 def compute_htn_stage(sys, dia):
@@ -110,11 +121,16 @@ def compute_htn_stage(sys, dia):
         d = int(dia) if dia else None
     except (TypeError, ValueError):
         return None
-    if s is None or d is None: return None
-    if s < 120 and d < 80: return "normal"
-    if 120 <= s <= 129 and d < 80: return "elevada"
-    if (130 <= s <= 139) or (80 <= d <= 89): return "HTA grado 1"
-    if s >= 140 or d >= 90: return "HTA grado 2"
+    if s is None or d is None:
+        return None
+    if s < 120 and d < 80:
+        return "normal"
+    if 120 <= s <= 129 and d < 80:
+        return "elevada"
+    if (130 <= s <= 139) or (80 <= d <= 89):
+        return "HTA grado 1"
+    if s >= 140 or d >= 90:
+        return "HTA grado 2"
     return None
 
 # ==========================
@@ -122,8 +138,12 @@ def compute_htn_stage(sys, dia):
 # ==========================
 def _filters_to_where(filters):
     where, params = [], []
-    if filters.get("risk"): where.append("LOWER(risk)=LOWER(?)"); params.append(filters["risk"])
-    if filters.get("name"): where.append("LOWER(name) LIKE LOWER(?)"); params.append(f"%{filters['name']}%")
+    if filters.get("risk"):
+        where.append("LOWER(risk)=LOWER(?)")
+        params.append(filters["risk"])
+    if filters.get("name"):
+        where.append("LOWER(name) LIKE LOWER(?)")
+        params.append(f"%{filters['name']}%")
     where_sql = (" WHERE " + " AND ".join(where)) if where else ""
     return where_sql, params
 
@@ -132,9 +152,13 @@ def rows_to_list(filters=None, limit=None, offset=None):
     where_sql, params = _filters_to_where(filters)
     limit_sql = ""
     if limit and offset is not None:
-        limit_sql = " LIMIT ? OFFSET ?"; params += [limit, offset]
+        limit_sql = " LIMIT ? OFFSET ?"
+        params += [limit, offset]
     conn = get_db()
-    rows = conn.execute("SELECT * FROM patients"+where_sql+" ORDER BY id DESC"+limit_sql, params).fetchall()
+    rows = conn.execute(
+        "SELECT * FROM patients" + where_sql + " ORDER BY id DESC" + limit_sql,
+        params,
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -142,22 +166,28 @@ def count_rows(filters=None):
     filters = filters or {}
     where_sql, params = _filters_to_where(filters)
     conn = get_db()
-    n = conn.execute("SELECT COUNT(*) c FROM patients"+where_sql, params).fetchone()["c"]
+    n = conn.execute(
+        "SELECT COUNT(*) c FROM patients" + where_sql, params
+    ).fetchone()["c"]
     conn.close()
     return n
 
 # ==========================
-# Exportaciones
+# Exportaciones (helpers)
 # ==========================
 def export_xlsx():
     data = rows_to_list()
-    wb = Workbook(); ws = wb.active; ws.title = "patients"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "patients"
     headers = [col for col in data[0].keys()] if data else []
     if not headers:
-        headers = ["id","name","age","sex","schooling","glucose_mgdl","risk"]
+        headers = ["id", "name", "age", "sex", "schooling", "glucose_mgdl", "risk"]
     ws.append(headers)
-    for row in data: ws.append([row.get(h) for h in headers])
-    for i in range(1, len(headers)+1): ws.column_dimensions[get_column_letter(i)].width = 14
+    for row in data:
+        ws.append([row.get(h) for h in headers])
+    for i in range(1, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(i)].width = 14
     wb.save(XLSX_PATH)
 
 def export_pdf():
@@ -165,61 +195,102 @@ def export_pdf():
     pdf = SimpleDocTemplate(PDF_PATH, pagesize=landscape(A4), title="Pacientes")
     styles = getSampleStyleSheet()
     if not data:
-        pdf.build([Paragraph("No hay registros para exportar.", styles["Title"])]); return
-    headers = ["ID","Fecha","Nombre","Edad","Sexo","Escolaridad","Glucemia","Riesgo"]
+        pdf.build([Paragraph("No hay registros para exportar.", styles["Title"])])
+        return
+    headers = [
+        "ID",
+        "Fecha",
+        "Nombre",
+        "Edad",
+        "Sexo",
+        "Escolaridad",
+        "Glucemia",
+        "Riesgo",
+    ]
     rows = []
     for r in data:
-        rows.append([r.get("id"), (r.get("created_at") or "")[:19], r.get("name",""),
-                     r.get("age",""), r.get("sex",""), r.get("schooling",""),
-                     r.get("glucose_mgdl",""), r.get("risk","")])
+        rows.append(
+            [
+                r.get("id"),
+                (r.get("created_at") or "")[:19],
+                r.get("name", ""),
+                r.get("age", ""),
+                r.get("sex", ""),
+                r.get("schooling", ""),
+                r.get("glucose_mgdl", ""),
+                r.get("risk", ""),
+            ]
+        )
     table = Table([headers] + rows, repeatRows=1)
-    table.setStyle(TableStyle([
-        ("BACKGROUND",(0,0),(-1,0), colors.HexColor("#004C70")),
-        ("TEXTCOLOR",(0,0),(-1,0), colors.white),
-        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-        ("FONTSIZE",(0,0),(-1,0),10),
-        ("GRID",(0,0),(-1,-1),0.25, colors.grey)
-    ]))
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#004C70")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 10),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+            ]
+        )
+    )
     pdf.build([table])
 
 # ==========================
 # Utilidades
 # ==========================
-def _b(v): return 1 if v else 0
+def _b(v):
+    return 1 if v else 0
 
 # ==========================
 # Rutas API
 # ==========================
 @app.route("/api/health")
-def health(): return jsonify({"status":"ok","time":datetime.utcnow().isoformat()+"Z"})
+def health():
+    return jsonify({"status": "ok", "time": datetime.utcnow().isoformat() + "Z"})
 
 @app.route("/api/patients", methods=["GET", "POST"])
 @app.route("/api/patients/", methods=["GET", "POST"])
 def patients_handler():
     if request.method == "GET":
-        risk = request.args.get("risk"); name = request.args.get("name")
-        page = int(request.args.get("page", 1)); page_size = int(request.args.get("page_size", 10))
-        page = max(1, page); page_size = max(1, min(page_size, 100))
+        risk = request.args.get("risk")
+        name = request.args.get("name")
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 10))
+        page = max(1, page)
+        page_size = max(1, min(page_size, 100))
         filters = {"risk": risk, "name": name}
         total = count_rows(filters)
-        offset = (page-1)*page_size
+        offset = (page - 1) * page_size
         items = rows_to_list(filters, limit=page_size, offset=offset)
-        return jsonify({"items": items, "total": total, "page": page, "page_size": page_size, "pages": math.ceil(total/page_size)})
+        return jsonify(
+            {
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "pages": math.ceil(total / page_size) if page_size else 1,
+            }
+        )
 
     # POST
     d = request.get_json(force=True)
     name = (d.get("name") or "").strip()
-    if not name: return jsonify({"error":"El nombre es obligatorio."}), 400
-    try: g = float(d.get("glucose_mgdl"))
-    except (TypeError, ValueError): return jsonify({"error":"La glucemia (mg/dL) debe ser numérica."}), 400
+    if not name:
+        return jsonify({"error": "El nombre es obligatorio."}), 400
+    try:
+        g = float(d.get("glucose_mgdl"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "La glucemia (mg/dL) debe ser numérica."}), 400
 
     risk = compute_risk(g)
     bmi, bmi_cat = compute_bmi(d.get("weight_kg"), d.get("height_cm"))
     htn_stage = compute_htn_stage(d.get("systolic"), d.get("diastolic"))
     created_at = datetime.utcnow().isoformat() + "Z"
 
-    conn = get_db(); cur = conn.cursor()
-    cur.execute("""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
         INSERT INTO patients (name, age, sex, schooling, glucose_mgdl, risk,
         has_hypertension, has_obesity, has_dyslipidemia, has_ckd, has_cvd,
         has_copd_asthma, has_depression, systolic, diastolic, htn_stage,
@@ -227,42 +298,89 @@ def patients_handler():
         med_htn, med_dm, med_insulin, med_metformin, med_statins,
         med_antiplatelet, med_other, notes, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, [d.get("name"), d.get("age"), d.get("sex"), d.get("schooling"), g, risk,
-          _b(d.get("has_hypertension")), _b(d.get("has_obesity")), _b(d.get("has_dyslipidemia")), _b(d.get("has_ckd")),
-          _b(d.get("has_cvd")), _b(d.get("has_copd_asthma")), _b(d.get("has_depression")),
-          d.get("systolic"), d.get("diastolic"), htn_stage, d.get("weight_kg"), d.get("height_cm"),
-          bmi, bmi_cat, _b(d.get("smoker")), d.get("physical_activity"),
-          _b(d.get("med_htn")), _b(d.get("med_dm")), _b(d.get("med_insulin")), _b(d.get("med_metformin")),
-          _b(d.get("med_statins")), _b(d.get("med_antiplatelet")), d.get("med_other"), d.get("notes"), created_at])
-    conn.commit(); conn.close()
-    export_xlsx(); export_pdf()
+        """,
+        [
+            d.get("name"),
+            d.get("age"),
+            d.get("sex"),
+            d.get("schooling"),
+            g,
+            risk,
+            _b(d.get("has_hypertension")),
+            _b(d.get("has_obesity")),
+            _b(d.get("has_dyslipidemia")),
+            _b(d.get("has_ckd")),
+            _b(d.get("has_cvd")),
+            _b(d.get("has_copd_asthma")),
+            _b(d.get("has_depression")),
+            d.get("systolic"),
+            d.get("diastolic"),
+            htn_stage,
+            d.get("weight_kg"),
+            d.get("height_cm"),
+            bmi,
+            bmi_cat,
+            _b(d.get("smoker")),
+            d.get("physical_activity"),
+            _b(d.get("med_htn")),
+            _b(d.get("med_dm")),
+            _b(d.get("med_insulin")),
+            _b(d.get("med_metformin")),
+            _b(d.get("med_statins")),
+            _b(d.get("med_antiplatelet")),
+            d.get("med_other"),
+            d.get("notes"),
+            created_at,
+        ],
+    )
+    conn.commit()
+    conn.close()
+    export_xlsx()
+    export_pdf()
     return jsonify({"ok": True})
+
+# GET por id (para editar)
+@app.route("/api/patients/<int:pid>", methods=["GET"])
+def get_patient(pid):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM patients WHERE id=?", (pid,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "no encontrado"}), 404
+    return jsonify(dict(row))
 
 @app.route("/api/patients/<int:pid>", methods=["PUT", "DELETE"])
 def modify_patient(pid):
     conn = get_db()
     if request.method == "DELETE":
         conn.execute("DELETE FROM patients WHERE id=?", (pid,))
-        conn.commit(); conn.close()
-        export_xlsx(); export_pdf()
+        conn.commit()
+        conn.close()
+        export_xlsx()
+        export_pdf()
         return jsonify({"ok": True})
 
     # PUT
     d = request.get_json(force=True)
     to_set = {}
-    for k,v in d.items():
+    for k, v in d.items():
         if k.startswith("has_") or k.startswith("med_") or k in ["smoker"]:
             to_set[k] = 1 if v else 0
         else:
             to_set[k] = v
     if "glucose_mgdl" in d:
-        try: g=float(d["glucose_mgdl"])
-        except (TypeError, ValueError): return jsonify({"error":"La glucemia debe ser numérica."}), 400
+        try:
+            g = float(d["glucose_mgdl"])
+        except (TypeError, ValueError):
+            return jsonify({"error": "La glucemia debe ser numérica."}), 400
         to_set["risk"] = compute_risk(g)
-    cols=", ".join([f"{k}=?" for k in to_set.keys()]); vals=list(to_set.values())+[pid]
+    cols = ", ".join([f"{k}=?" for k in to_set.keys()])
+    vals = list(to_set.values()) + [pid]
     conn.execute(f"UPDATE patients SET {cols} WHERE id=?", vals)
-    conn.commit(); conn.close()
-    export_xlsx(); export_pdf()
+    conn.commit()
+    conn.close()
+    export_xlsx()
+    export_pdf()
     return jsonify({"ok": True})
 
 # ==========================
@@ -274,12 +392,70 @@ def stats():
     conn = get_db()
     cur = conn.cursor()
     total = cur.execute("SELECT COUNT(*) c FROM patients").fetchone()["c"]
-    by_risk = {r["risk"] or "desconocido": r["c"] for r in cur.execute("SELECT risk, COUNT(*) c FROM patients GROUP BY risk").fetchall()}
-    by_bmi = {r["bmi_cat"] or "sin dato": r["c"] for r in cur.execute("SELECT bmi_cat, COUNT(*) c FROM patients GROUP BY bmi_cat").fetchall()}
-    with_htn = cur.execute("SELECT COUNT(*) c FROM patients WHERE has_hypertension=1").fetchone()["c"]
-    with_obesity = cur.execute("SELECT COUNT(*) c FROM patients WHERE has_obesity=1").fetchone()["c"]
+    by_risk = {
+        r["risk"] or "desconocido": r["c"]
+        for r in cur.execute(
+            "SELECT risk, COUNT(*) c FROM patients GROUP BY risk"
+        ).fetchall()
+    }
+    by_bmi = {
+        r["bmi_cat"] or "sin dato": r["c"]
+        for r in cur.execute(
+            "SELECT bmi_cat, COUNT(*) c FROM patients GROUP BY bmi_cat"
+        ).fetchall()
+    }
+    with_htn = cur.execute(
+        "SELECT COUNT(*) c FROM patients WHERE has_hypertension=1"
+    ).fetchone()["c"]
+    with_obesity = cur.execute(
+        "SELECT COUNT(*) c FROM patients WHERE has_obesity=1"
+    ).fetchone()["c"]
     conn.close()
-    return jsonify({"total": total, "by_risk": by_risk, "by_bmi": by_bmi, "with_hypertension": with_htn, "with_obesity": with_obesity})
+    return jsonify(
+        {
+            "total": total,
+            "by_risk": by_risk,
+            "by_bmi": by_bmi,
+            "with_hypertension": with_htn,
+            "with_obesity": with_obesity,
+        }
+    )
+
+# ==========================
+# Exportaciones vía API
+# ==========================
+@app.route("/api/export/csv")
+@app.route("/api/export/csv/")
+def export_csv_route():
+    rows = rows_to_list()
+    out = io.StringIO()
+    w = csv.writer(out)
+    if rows:
+        headers = list(rows[0].keys())
+        w.writerow(headers)
+        for r in rows:
+            w.writerow([r.get(h) for h in headers])
+    return Response(
+        out.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=patients.csv"},
+    )
+
+@app.route("/api/export/xlsx")
+@app.route("/api/export/xlsx/")
+def export_xlsx_route():
+    export_xlsx()
+    return send_file(
+        XLSX_PATH, as_attachment=True, download_name="patients.xlsx"
+    )
+
+@app.route("/api/export/pdf")
+@app.route("/api/export/pdf/")
+def export_pdf_route():
+    export_pdf()
+    return send_file(
+        PDF_PATH, as_attachment=True, download_name="patients.pdf"
+    )
 
 # ==========================
 # Frontend
